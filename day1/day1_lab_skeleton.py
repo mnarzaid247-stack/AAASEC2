@@ -141,29 +141,6 @@ def audit_node(state: AgentState):
         ]
     }
 
-
-# ============================================================
-# STEP 5 — THE CONDITIONAL EDGE (the heart of this lab)
-# ============================================================
-# Write a router function: takes state, RETURNS THE NAME of the
-# next node as a string.
-#
-# CRITICAL — loops must terminate. Two rules:
-#   a) every retry must change something (your query, Step 4.2),
-#   b) hard-cap the retries with iteration_count.
-# Without both, same search → same score → infinite loop → LangGraph
-# kills the run at recursion limit 25 with GraphRecursionError.
-#
-# WHERE TO LOOK (read BOTH):
-#   - "Conditional branching":
-#     https://docs.langchain.com/oss/python/langgraph/use-graph-api#conditional-branching
-#   - "Create and control loops":
-#     https://docs.langchain.com/oss/python/langgraph/use-graph-api#create-and-control-loops
-#
-# EXPERIMENT: comment out the iteration cap, force low scores, run,
-# and read the GraphRecursionError message. Now you understand why
-# the docs insist on termination conditions.
-
 def quality_router(state: AgentState) -> str:
     if state["quality_score"] >= 7:
         return "report"
