@@ -151,6 +151,7 @@ async def create_response(
 async def agent_card():
 
     return {
+        "protocolVersion": "1.0",
         "name": f"{STUDENT_NAME} Day 3 Agent",
         "description": (
             "A Deep Agent exposed through "
@@ -160,22 +161,38 @@ async def agent_card():
             f"{PUBLIC_URL.rstrip('/')}"
             f"/v1/responses"
         ),
-        "version": "1.0.0",
+        "version": "0.1.0",
+        "capabilities": {
+            "streaming": False,
+        },
+        "defaultInputModes": [
+            "text/plain",
+        ],
+        "defaultOutputModes": [
+            "text/plain",
+        ],
         "skills": [
             {
-                "name": "calculate",
+                "id": "calculate",
+                "name": "Calculate",
                 "description": (
-                    "Evaluate simple arithmetic expressions"
+                    "Evaluate simple arithmetic expressions."
                 ),
+                "tags": [
+                    "math",
+                    "calculation",
+                ],
             },
             {
-                "name": "current_time",
+                "id": "current-time",
+                "name": "Current Time",
                 "description": (
-                    "Return the current local date and time"
+                    "Return the current local date and time."
                 ),
+                "tags": [
+                    "time",
+                    "utility",
+                ],
             },
         ],
-        "capabilities": {
-            "streaming": False
-        },
     }

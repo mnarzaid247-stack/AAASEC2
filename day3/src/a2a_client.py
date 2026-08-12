@@ -1,5 +1,5 @@
 import sys
-import requests
+import httpx
 
 
 def discover(peer_base_url: str) -> dict:
@@ -13,9 +13,9 @@ def discover(peer_base_url: str) -> dict:
         f"{base_url}/.well-known/agent-card.json"
     )
 
-    response = requests.get(
+    response = httpx.get(
         card_url,
-        timeout=10,
+        timeout=10.0,
     )
 
     response.raise_for_status()
@@ -35,12 +35,10 @@ def discover(peer_base_url: str) -> dict:
         print("Skills:")
 
         for skill in skills:
-
             if isinstance(skill, dict):
                 print(
-                    f"- {skill.get('name', skill)}"
+                    f"- {skill.get('name', 'Unnamed skill')}"
                 )
-
             else:
                 print(
                     f"- {skill}"
@@ -52,51 +50,62 @@ def discover(peer_base_url: str) -> dict:
     return card
 
 
+def extract_output_text(data: dict) -> str:
+    """
+    Extract output_text from an OpenResponses-shaped response.
+    """
+
+    for output_item in data.get("output", []):
+
+        if output_item.get("type") != "message":
+            continue
+
+        for content_item in output_item.get(
+            "content",
+            [],
+        ):
+
+            if content_item.get("type") == "output_text":
+                return content_item.get(
+                    "text",
+                    "",
+                )
+
+    raise ValueError(
+        "No output_text found in the response."
+    )
+
+
 def delegate(
     card: dict,
     task: str,
 ) -> str:
     """
-    Send a task to the discovered agent.
+    Delegate a task using the endpoint provided by the Agent Card.
     """
 
     endpoint = card.get("url")
 
     if not endpoint:
         raise ValueError(
-            "Agent card does not contain a URL."
+            "Agent Card does not contain a URL."
         )
 
-    response = requests.post(
+    response = httpx.post(
         endpoint,
         json={
-            "input": task
+            "input": task,
         },
-        timeout=60,
+        timeout=60.0,
     )
 
     response.raise_for_status()
 
     data = response.json()
 
-    try:
-        text = (
-            data["output"][0]
-            ["content"][0]
-            ["text"]
-        )
-
-    except (
-        KeyError,
-        IndexError,
-        TypeError,
-    ) as error:
-
-        raise ValueError(
-            "Invalid OpenResponses reply."
-        ) from error
-
-    return text
+    return extract_output_text(
+        data
+    )
 
 
 def main():
@@ -104,11 +113,7 @@ def main():
     if len(sys.argv) < 3:
 
         print(
-            "Usage:"
-        )
-
-        print(
-            "uv run python src/a2a_client.py "
+            "Usage: uv run python src/a2a_client.py "
             'http://<peer> "task for their agent"'
         )
 

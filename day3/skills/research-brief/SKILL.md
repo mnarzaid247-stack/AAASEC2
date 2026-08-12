@@ -1,58 +1,46 @@
 ---
 name: research-brief
-description: Create a concise research brief from a topic or question.
+description: Produce a concise research brief with exactly three findings, a recommendation, and a confidence statement.
 ---
 
 # Research Brief
 
-Use this skill when the user asks for a short research brief, summary, or structured analysis of a topic.
+Use this skill when the user asks for a concise research brief on a topic or question.
 
 ## Instructions
 
-When creating a research brief:
-
-1. Clearly identify the topic or question.
-2. Summarize the most important information.
-3. Organize the findings into clear sections.
-4. Separate factual findings from recommendations.
-5. Keep the writing concise and professional.
-6. Do not invent facts or sources.
-7. If information is missing, clearly state the limitation.
+1. Start with a clear headline.
+2. Provide exactly three key findings.
+3. Keep each finding concise and evidence-focused.
+4. Add one recommendation based on the findings.
+5. End with a confidence statement.
+6. Do not invent facts, statistics, or sources.
+7. If evidence is limited, state that clearly in the confidence section.
 
 ## Output Format
 
-Use the following structure:
-
 ```markdown
-# Research Brief: <Topic>
+# <Headline>
 
-## Executive Summary
+## Findings
 
-Provide a short summary of the main findings.
-
-## Key Findings
-
-- Finding 1
-- Finding 2
-- Finding 3
-
-## Analysis
-
-Explain the important patterns, implications, risks, or opportunities.
+1. <Finding one>
+2. <Finding two>
+3. <Finding three>
 
 ## Recommendation
 
-Provide a concise recommendation based on the available information.
+<One concise recommendation>
 
-## Limitations
+## Confidence
 
-Mention any missing information or uncertainty.
+<High, Medium, or Low — with a short explanation>
 ```
 
-## Writing Style
+## Style
 
 - Professional
-- Clear
 - Concise
+- Clear
 - Evidence-focused
-- Avoid unnecessary repetition
+- No unnecessary repetition

@@ -106,4 +106,4 @@ day1_lab_solution.py
 
 ## Author
 
-Manar Zaid
+Manar alzhrani

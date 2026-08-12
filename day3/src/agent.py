@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
 from pathlib import Path
+import ast
+import operator
 
 from dotenv import load_dotenv
 from langchain_core.tools import tool
@@ -16,24 +18,64 @@ USE_FAKE = os.getenv("USE_FAKE", "0") == "1"
 
 @tool
 def calculate(expression: str) -> str:
-    """Evaluate a simple arithmetic expression."""
+    """Evaluate a simple arithmetic expression safely."""
 
-    allowed_chars = set("0123456789+-*/(). %")
+    operators = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+        ast.FloorDiv: operator.floordiv,
+        ast.Mod: operator.mod,
+        ast.Pow: operator.pow,
+        ast.USub: operator.neg,
+        ast.UAdd: operator.pos,
+    }
 
-    if not set(expression) <= allowed_chars:
-        return "Invalid expression."
+    def evaluate(node):
+        if isinstance(node, ast.Expression):
+            return evaluate(node.body)
+
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)):
+                return node.value
+            raise ValueError("Only numbers are allowed.")
+
+        if isinstance(node, ast.BinOp):
+            operation = operators.get(type(node.op))
+
+            if operation is None:
+                raise ValueError("Unsupported operator.")
+
+            return operation(
+                evaluate(node.left),
+                evaluate(node.right),
+            )
+
+        if isinstance(node, ast.UnaryOp):
+            operation = operators.get(type(node.op))
+
+            if operation is None:
+                raise ValueError("Unsupported operator.")
+
+            return operation(
+                evaluate(node.operand)
+            )
+
+        raise ValueError("Invalid expression.")
 
     try:
-        result = eval(
+        tree = ast.parse(
             expression,
-            {"__builtins__": {}},
-            {},
+            mode="eval",
         )
-        return str(result)
+
+        return str(
+            evaluate(tree)
+        )
 
     except Exception as error:
         return f"Calculation error: {error}"
-
 
 @tool
 def current_time() -> str:
@@ -149,18 +191,20 @@ async def main():
                 {
                     "role": "user",
                     "content": (
-                        "Hello. Tell me what tools "
-                        "you can use."
+                        "Create a research brief about the benefits and risks "
+                        "of multi-agent AI systems. "
+                        "Use the research-brief skill. "
+                        "Include exactly three findings, a recommendation, "
+                        "and a confidence section. "
+                        "Save the final report to "
+                        "/artifacts/research_brief.md using your filesystem tools."
                     ),
                 }
             ]
         }
     )
 
-    messages = result.get(
-        "messages",
-        [],
-    )
+    messages = result.get("messages", [])
 
     if not messages:
         print("No reply received.")
@@ -169,26 +213,23 @@ async def main():
     last_message = messages[-1]
 
     if isinstance(last_message, dict):
-        print(
-            last_message.get(
-                "content",
-                last_message,
-            )
-        )
+        reply = last_message.get("content", "")
     else:
-        print(
-            getattr(
-                last_message,
-                "content",
-                last_message,
-            )
-        )
+        reply = getattr(last_message, "content", "")
+
+    print(reply)
+
+    day3_root = Path(__file__).resolve().parent.parent
+    artifact_path = day3_root / "artifacts" / "research_brief.md"
+
+    print()
+
+    if artifact_path.exists():
+        print(f"Artifact created: {artifact_path}")
+    else:
+        print("Artifact was not created.")
 
 
 if __name__ == "__main__":
-
     import asyncio
-
-    asyncio.run(
-        main()
-    )
+    asyncio.run(main())

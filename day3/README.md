@@ -1,10 +1,21 @@
-# Day 3 — Deep Agent API and A2A Communication
+# Day 3 — Deep Agents, Skills, MCP, Docker, and A2A
 
 ## Overview
 
-This project implements a Deep Agent and exposes it through a FastAPI HTTP API.
+This project implements a Deep Agent and exposes it as a production-style service.
 
-The agent supports basic tools, filesystem access, an OpenResponses-style endpoint, and A2A discovery and delegation.
+The project demonstrates:
+
+- Deep Agent creation
+- Custom tools
+- Agent Skills
+- FastAPI HTTP API
+- OpenResponses-style responses
+- A2A Agent Card discovery
+- Agent-to-Agent delegation
+- FastMCP tools and skill resources
+- Docker containerization
+- Docker Compose multi-service orchestration
 
 ## Project Structure
 
@@ -12,28 +23,37 @@ The agent supports basic tools, filesystem access, an OpenResponses-style endpoi
 day3/
 ├── README.md
 ├── .env.example
+├── Dockerfile
+├── compose.yaml
 ├── pyproject.toml
 ├── uv.lock
+│
+├── skills/
+│   ├── research-brief/
+│   │   └── SKILL.md
+│   └── data-analysis-summary/
+│       └── SKILL.md
+│
 └── src/
     ├── agent.py
     ├── api.py
-    └── a2a_client.py
+    ├── a2a_client.py
+    └── mcp_server.py
 ```
 
-## Components
+## 1. Deep Agent
 
-### Agent
+`src/agent.py` builds the main Deep Agent.
 
-`src/agent.py` builds the Deep Agent.
-
-The agent includes:
+The agent provides:
 
 - `calculate` — evaluates simple arithmetic expressions.
 - `current_time` — returns the current local date and time.
-- Filesystem tools provided by `FilesystemBackend`.
-- Fake mode for testing without API keys.
+- Filesystem tools through `FilesystemBackend`.
+- Agent Skills from the `/skills/` directory.
+- Fake mode for offline testing.
 
-The agent follows this interface:
+The main contract is:
 
 ```python
 agent = build_agent()
@@ -48,7 +68,28 @@ result = await agent.ainvoke({
 })
 ```
 
-### HTTP API
+## 2. Agent Skills
+
+The project includes two skills.
+
+### Research Brief
+
+`skills/research-brief/SKILL.md`
+
+Produces a concise research brief containing:
+
+- A headline
+- Exactly three findings
+- A recommendation
+- A confidence statement
+
+### Data Analysis Summary
+
+`skills/data-analysis-summary/SKILL.md`
+
+Provides instructions for turning statistical or analytical findings into a concise summary for a non-technical audience.
+
+## 3. HTTP API
 
 `src/api.py` exposes the agent using FastAPI.
 
@@ -60,9 +101,27 @@ POST /v1/responses
 GET  /.well-known/agent-card.json
 ```
 
-`/healthz` provides a simple health check.
+### Health Check
 
-`/v1/responses` accepts a request such as:
+```text
+GET /healthz
+```
+
+returns:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### OpenResponses Endpoint
+
+```text
+POST /v1/responses
+```
+
+accepts:
 
 ```json
 {
@@ -70,26 +129,70 @@ GET  /.well-known/agent-card.json
 }
 ```
 
-and returns an OpenResponses-style response.
+and returns an OpenResponses-style response containing the assistant output.
 
-The Agent Card endpoint provides information that other agents can use to discover this agent.
+## 4. A2A Agent Card
 
-### A2A Client
+The agent exposes an A2A Agent Card at:
 
-`src/a2a_client.py` demonstrates agent-to-agent discovery and delegation.
+```text
+/.well-known/agent-card.json
+```
+
+The card describes the agent, its capabilities, skills, and response endpoint.
+
+Other agents can use this endpoint to discover the agent before delegating work.
+
+## 5. A2A Delegation
+
+`src/a2a_client.py` implements discovery and delegation.
 
 The client:
 
-1. Retrieves the peer's Agent Card.
-2. Reads the peer's endpoint from the card.
-3. Sends a task to that endpoint.
-4. Extracts the returned `output_text`.
+1. Retrieves the peer Agent Card.
+2. Reads the available skills.
+3. Reads the response endpoint from `card["url"]`.
+4. Sends a task to the discovered endpoint.
+5. Extracts `output_text` from the OpenResponses reply.
 
-The response endpoint is discovered from the Agent Card and is not hardcoded in the client.
+The response endpoint is not hardcoded in the client.
 
-## Environment Variables
+Example:
 
-Create a `.env` file with:
+```bash
+uv run python src/a2a_client.py http://localhost:8000 "What time is it?"
+```
+
+## 6. MCP Server
+
+`src/mcp_server.py` exposes tools and skills through FastMCP.
+
+The MCP server provides two callable tools:
+
+- `calculate`
+- `word_stats`
+
+It also exposes the project skills as MCP resources using `SkillsDirectoryProvider`.
+
+The server runs on port `8001`.
+
+Run it with:
+
+```bash
+uv run python src/mcp_server.py
+```
+
+The MCP endpoint is:
+
+```text
+http://localhost:8001/mcp
+```
+
+## 7. Environment Variables
+
+Copy `.env.example` to `.env` and provide the required values.
+
+Example:
 
 ```env
 OPENAI_API_KEY=your_openrouter_api_key
@@ -97,64 +200,58 @@ STUDENT_NAME=Manar Zaid
 PUBLIC_URL=http://localhost:8000
 ```
 
-Do not commit the `.env` file or API keys to GitHub.
+For offline testing:
 
-## Installation
+```env
+USE_FAKE=1
+```
 
-Install the project dependencies:
+Never commit the real `.env` file or API keys.
+
+## 8. Installation
+
+Install dependencies using:
 
 ```bash
 uv sync
 ```
 
-## Run the Agent
+## 9. Run the Agent
 
-### Fake Mode
-
-PowerShell:
+### Fake Mode — PowerShell
 
 ```powershell
 $env:USE_FAKE="1"
 uv run python src/agent.py
 ```
 
-### Real Agent
+### Real Mode
 
 ```powershell
 Remove-Item Env:USE_FAKE
 uv run python src/agent.py
 ```
 
-## Run the API
-
-For offline testing:
+## 10. Run the API
 
 ```powershell
 $env:USE_FAKE="1"
 uv run uvicorn src.api:app --reload
 ```
 
-The API will run at:
+The API runs at:
 
 ```text
 http://localhost:8000
 ```
 
-## Test the API
-
-Health check:
+Test the health endpoint:
 
 ```powershell
 curl.exe http://localhost:8000/healthz
 ```
 
-Expected result:
-
-```json
-{"status":"ok"}
-```
-
-Test the agent endpoint:
+Test the response endpoint:
 
 ```powershell
 curl.exe -X POST http://localhost:8000/v1/responses `
@@ -162,28 +259,53 @@ curl.exe -X POST http://localhost:8000/v1/responses `
   -d '{\"input\":\"hi\"}'
 ```
 
-Test Agent Card discovery:
+Test the Agent Card:
 
 ```powershell
 curl.exe http://localhost:8000/.well-known/agent-card.json
 ```
 
-## Test A2A Delegation
+## 11. Docker
 
-With the API running:
+Build the agent image:
 
-```powershell
-uv run python src/a2a_client.py http://localhost:8000 "What time is it?"
+```bash
+docker build -t aaasec2-agent .
 ```
 
-The client discovers the agent through:
+Run the API container:
+
+```bash
+docker run --rm -p 8000:8000 --env-file .env aaasec2-agent
+```
+
+## 12. Docker Compose
+
+The project contains two services:
 
 ```text
-/.well-known/agent-card.json
+agent-api → port 8000
+mcp       → port 8001
 ```
 
-and delegates the task using the URL provided by the Agent Card.
+Inside the Compose network, the API can address the MCP service using:
+
+```text
+http://mcp:8001/mcp
+```
+
+Start the services with:
+
+```bash
+docker compose up --build
+```
+
+Stop them with:
+
+```bash
+docker compose down
+```
 
 ## Author
 
-Manar Zaid
+Manar alzhrani
