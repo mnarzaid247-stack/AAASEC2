@@ -1,27 +1,181 @@
-"""
-DAY 3 — HTTP API.
+import os
+import time
+import uuid
 
-READ FIRST:  ../03-fastapi-openresponses.md
-             ../09-a2a.md   (for the agent card endpoint)
+from fastapi import FastAPI
+from pydantic import BaseModel
 
-Do not continue to 04-docker.md until:
-    curl http://localhost:8000/healthz            -> {"status":"ok"}
-    curl -X POST http://localhost:8000/v1/responses \
-         -H 'Content-Type: application/json' -d '{"input":"hi"}'
-returns an OpenResponses-shaped JSON object.
+from src.agent import build_agent
 
-TODO:
-  1. app = FastAPI(...); agent = build_agent()   <- built ONCE, at startup
-  2. GET  /healthz
-  3. POST /v1/responses  — accept {"input": "...", "model": optional},
-     invoke the agent, return:
-       {id, object:"response", created_at, status:"completed", model,
-        output:[{type:"message", role:"assistant",
-                 content:[{type:"output_text", text: ...}]}]}
-     (a deliberate SUBSET of OpenResponses — the shape, not the whole spec)
-  4. GET /.well-known/agent-card.json — your A2A Agent Card. Use
-     STUDENT_NAME and PUBLIC_URL from the environment; the card's "url"
-     field must point at YOUR /v1/responses.
-"""
+# ============================================================
+# ENVIRONMENT
+# ============================================================
 
-# TODO
+STUDENT_NAME = os.getenv(
+    "STUDENT_NAME",
+    "Manar Zaid",
+)
+
+PUBLIC_URL = os.getenv(
+    "PUBLIC_URL",
+    "http://localhost:8000",
+)
+
+
+# ============================================================
+# FASTAPI APP
+# ============================================================
+
+app = FastAPI(
+    title="Day 3 Agent API",
+    version="1.0.0",
+)
+
+
+# Build the agent only once when the application starts.
+agent = build_agent()
+
+
+# ============================================================
+# REQUEST MODEL
+# ============================================================
+
+class ResponseRequest(BaseModel):
+    input: str
+    model: str | None = None
+
+
+# ============================================================
+# HELPER
+# ============================================================
+
+def extract_agent_reply(result) -> str:
+    """
+    Extract the final assistant text from the agent result.
+    """
+
+    messages = result.get(
+        "messages",
+        [],
+    )
+
+    if not messages:
+        return ""
+
+    last_message = messages[-1]
+
+    if isinstance(last_message, dict):
+        return str(
+            last_message.get(
+                "content",
+                "",
+            )
+        )
+
+    return str(
+        getattr(
+            last_message,
+            "content",
+            "",
+        )
+    )
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/healthz")
+async def health_check():
+
+    return {
+        "status": "ok"
+    }
+
+
+# ============================================================
+# OPENRESPONSES ENDPOINT
+# ============================================================
+
+@app.post("/v1/responses")
+async def create_response(
+    request: ResponseRequest,
+):
+
+    result = await agent.ainvoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": request.input,
+                }
+            ]
+        }
+    )
+
+    reply = extract_agent_reply(
+        result
+    )
+
+    model_name = (
+        request.model
+        or "day3-agent"
+    )
+
+    return {
+        "id": f"resp_{uuid.uuid4().hex}",
+        "object": "response",
+        "created_at": int(time.time()),
+        "status": "completed",
+        "model": model_name,
+        "output": [
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": reply,
+                    }
+                ],
+            }
+        ],
+    }
+
+
+# ============================================================
+# A2A AGENT CARD
+# ============================================================
+
+@app.get("/.well-known/agent-card.json")
+async def agent_card():
+
+    return {
+        "name": f"{STUDENT_NAME} Day 3 Agent",
+        "description": (
+            "A Deep Agent exposed through "
+            "an OpenResponses-compatible API."
+        ),
+        "url": (
+            f"{PUBLIC_URL.rstrip('/')}"
+            f"/v1/responses"
+        ),
+        "version": "1.0.0",
+        "skills": [
+            {
+                "name": "calculate",
+                "description": (
+                    "Evaluate simple arithmetic expressions"
+                ),
+            },
+            {
+                "name": "current_time",
+                "description": (
+                    "Return the current local date and time"
+                ),
+            },
+        ],
+        "capabilities": {
+            "streaming": False
+        },
+    }

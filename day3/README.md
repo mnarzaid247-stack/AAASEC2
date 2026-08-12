@@ -1,85 +1,189 @@
-# Day 3 — Agents as Networked Software
+# Day 3 — Deep Agent API and A2A Communication
 
-Days 1–2 taught agent *frameworks*: you built the graph machinery yourself, then composed agents into a supervised team. Today the course changes character. **You will not build a fancier graph.** You will take an agent and turn it into what agents actually are in production: a versioned, containerized, discoverable network service that other agents can find and use.
+## Overview
 
-```
-Day 1:  build the machinery yourself        (LangGraph, your router)
-Day 2:  compose agents yourself             (supervisor pattern)
-Day 3:  use the higher-level harness —      (Deep Agents)
-        because you now understand what it hides —
-        and ship it as real software        (Git, HTTP, Docker, MCP, A2A)
-```
+This project implements a Deep Agent and exposes it through a FastAPI HTTP API.
 
-## No notebooks today
+The agent supports basic tools, filesystem access, an OpenResponses-style endpoint, and A2A discovery and delegation.
 
-Day 3 is files, processes, ports, containers, and commits. A notebook would hide exactly the things being taught. You will work in `src/*.py` with your editor and terminal, and **Git is the spine of the day** — every section ends with a commit, and your `git log` at the end of the day is a deliverable.
+## Project Structure
 
-## The map
-
-Work through the numbered guides in order. Each one tells you what to build, which `src/` file to edit, and ends with a Git checkpoint.
-
-| Guide | You build | New vocabulary |
-|---|---|---|
-| `00-git-and-forks.md` | your day-3 branch, upstream sync | working tree, index, HEAD, remotes, reflog |
-| `01-deep-agents.md` | `src/agent.py` | harness, backends, filesystem tools ≠ shell |
-| `02-agent-skills.md` | `skills/<yours>/SKILL.md` | progressive disclosure, prompt vs skill vs tool |
-| `03-fastapi-openresponses.md` | `src/api.py` | API contract ≠ agent implementation |
-| `04-docker.md` | `Dockerfile`, an image | image, container, layer, port, env |
-| `05-docker-compose.md` | `compose.yaml` | services, compose network, service DNS |
-| `06-fastmcp.md` | `src/mcp_server.py` | MCP: agent ↔ tools |
-| `07-skills-over-mcp.md` | skills as MCP resources | transporting knowledge ≠ executing it |
-| `08-stateful-vs-stateless.md` | a v4 protocol experiment | state handles, sticky sessions, why v4 |
-| `09-a2a.md` | agent card + `src/a2a_client.py` | A2A: agent ↔ agent, discovery |
-| `10-challenge.md` | delegation across the class network | the point of all of the above |
-
-The end state, per student:
-
-```
-                 Internet / class network
-                          │
-                 ┌────────▼─────────┐
-                 │  your instance    │
-                 │  (podman compose) │
-                 │  ┌─────────────┐  │
-     HTTP ───────┼──► FastAPI     │  │   /healthz
-                 │  │ OpenResponses│ │   /v1/responses
-                 │  └──────┬──────┘  │   /.well-known/agent-card.json
-                 │         │         │
-                 │    Deep Agent     │   tools + skills, NO shell (Day 4)
-                 │         │         │
-                 │  ┌──────▼──────┐  │
-                 │  │ FastMCP     │  │   tools + skill:// resources
-                 │  └─────────────┘  │
-                 └────────┬──────────┘
-                          │ A2A discovery + delegation
-                          ▼
-                  another student's agent
+```text
+day3/
+├── README.md
+├── .env.example
+├── pyproject.toml
+├── uv.lock
+└── src/
+    ├── agent.py
+    ├── api.py
+    └── a2a_client.py
 ```
 
-## Setup (5 min)
+## Components
+
+### Agent
+
+`src/agent.py` builds the Deep Agent.
+
+The agent includes:
+
+- `calculate` — evaluates simple arithmetic expressions.
+- `current_time` — returns the current local date and time.
+- Filesystem tools provided by `FilesystemBackend`.
+- Fake mode for testing without API keys.
+
+The agent follows this interface:
+
+```python
+agent = build_agent()
+
+result = await agent.ainvoke({
+    "messages": [
+        {
+            "role": "user",
+            "content": "Hello"
+        }
+    ]
+})
+```
+
+### HTTP API
+
+`src/api.py` exposes the agent using FastAPI.
+
+Available endpoints:
+
+```text
+GET  /healthz
+POST /v1/responses
+GET  /.well-known/agent-card.json
+```
+
+`/healthz` provides a simple health check.
+
+`/v1/responses` accepts a request such as:
+
+```json
+{
+  "input": "What time is it?"
+}
+```
+
+and returns an OpenResponses-style response.
+
+The Agent Card endpoint provides information that other agents can use to discover this agent.
+
+### A2A Client
+
+`src/a2a_client.py` demonstrates agent-to-agent discovery and delegation.
+
+The client:
+
+1. Retrieves the peer's Agent Card.
+2. Reads the peer's endpoint from the card.
+3. Sends a task to that endpoint.
+4. Extracts the returned `output_text`.
+
+The response endpoint is discovered from the Agent Card and is not hardcoded in the client.
+
+## Environment Variables
+
+Create a `.env` file with:
+
+```env
+OPENAI_API_KEY=your_openrouter_api_key
+STUDENT_NAME=Manar Zaid
+PUBLIC_URL=http://localhost:8000
+```
+
+Do not commit the `.env` file or API keys to GitHub.
+
+## Installation
+
+Install the project dependencies:
 
 ```bash
-git switch -c day3-api          # everything today happens on this branch (see 00-*.md)
-cd day3
 uv sync
-cp .env.example .env            # add your OpenRouter key; set STUDENT_NAME
 ```
 
-No key? `USE_FAKE=1` runs a deterministic fake agent — the *entire* HTTP/Docker/compose/A2A pipeline still works, which is most of today. Same OpenRouter setup as Day 1 (`day1/README.md`).
+## Run the Agent
 
-The `solutions/` folder contains reference implementations of every `src/` file. Same rule as always: TODOs first, solutions after you're stuck for real.
+### Fake Mode
 
-## What is deliberately NOT here
+PowerShell:
 
-Code execution and sandboxes. Deep Agents *can* execute code when connected to an execution backend. **We are not doing that today.** Tomorrow: agents writing code, agents executing code, isolation, permissions, resource limits, and "what could possibly go wrong?"
+```powershell
+$env:USE_FAKE="1"
+uv run python src/agent.py
+```
 
+### Real Agent
 
-## Submission 
+```powershell
+Remove-Item Env:USE_FAKE
+uv run python src/agent.py
+```
 
-Upload an agent + artifact, e.g. a Report Generation Agent: 
+## Run the API
 
-The agent code can be based on single agent (day 1) or multi agent (day 2) with an output 
+For offline testing:
 
-Example: the agent does researches, the final result is a report written in .txt or .md, submit both the agent code, and the output report (the artifact). 
-Another Example: An agent that generates images based on a predefined style, you can give him a query and he will try to use MCP by
-[Black Forest Labs](https://docs.bfl.ml/api_integration/mcp_integration) or [Fal AI](https://fal.ai/docs/documentation/setting-up/mcp), in this case submit the code and the artifact (the generated images)
+```powershell
+$env:USE_FAKE="1"
+uv run uvicorn src.api:app --reload
+```
+
+The API will run at:
+
+```text
+http://localhost:8000
+```
+
+## Test the API
+
+Health check:
+
+```powershell
+curl.exe http://localhost:8000/healthz
+```
+
+Expected result:
+
+```json
+{"status":"ok"}
+```
+
+Test the agent endpoint:
+
+```powershell
+curl.exe -X POST http://localhost:8000/v1/responses `
+  -H "Content-Type: application/json" `
+  -d '{\"input\":\"hi\"}'
+```
+
+Test Agent Card discovery:
+
+```powershell
+curl.exe http://localhost:8000/.well-known/agent-card.json
+```
+
+## Test A2A Delegation
+
+With the API running:
+
+```powershell
+uv run python src/a2a_client.py http://localhost:8000 "What time is it?"
+```
+
+The client discovers the agent through:
+
+```text
+/.well-known/agent-card.json
+```
+
+and delegates the task using the URL provided by the Agent Card.
+
+## Author
+
+Manar Zaid

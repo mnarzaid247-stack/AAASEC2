@@ -1,30 +1,194 @@
-"""
-DAY 3 — Agent implementation.
+import os
+from datetime import datetime
+from pathlib import Path
 
-READ FIRST:  ../01-deep-agents.md
+from dotenv import load_dotenv
+from langchain_core.tools import tool
 
-Do not continue to api.py until:
-    USE_FAKE=1 uv run python src/agent.py
-prints a reply, AND (with real keys) the agent answers using its tools.
+load_dotenv()
 
-The contract this file must satisfy — the ONLY thing api.py will rely on:
+USE_FAKE = os.getenv("USE_FAKE", "0") == "1"
 
-    def build_agent() -> object with .ainvoke({"messages": [...]})
 
-TODO:
-  1. Two boring tools: calculate(expression) and current_time().
-     (Boring is the point. Day 3 is about everything AROUND the agent.)
-  2. build_agent():
-       - if USE_FAKE: return a FakeAgent with the same .ainvoke shape
-       - else: create_deep_agent(model=<ChatOpenAI via OpenRouter>,
-                                 tools=[...], system_prompt=...,
-                                 backend=FilesystemBackend(root_dir=<day3/>,
-                                                           virtual_mode=True),
-                                 skills=["/skills/"])
-  3. A __main__ smoke test that invokes the agent once and prints the reply.
+# ============================================================
+# TOOLS
+# ============================================================
 
-NOTE: default backends give the agent FILESYSTEM tools but NO shell.
-An execute tool requires a sandbox backend — that is Day 4, on purpose.
-"""
+@tool
+def calculate(expression: str) -> str:
+    """Evaluate a simple arithmetic expression."""
 
-# TODO
+    allowed_chars = set("0123456789+-*/(). %")
+
+    if not set(expression) <= allowed_chars:
+        return "Invalid expression."
+
+    try:
+        result = eval(
+            expression,
+            {"__builtins__": {}},
+            {},
+        )
+        return str(result)
+
+    except Exception as error:
+        return f"Calculation error: {error}"
+
+
+@tool
+def current_time() -> str:
+    """Return the current local date and time."""
+
+    return datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+
+# ============================================================
+# FAKE AGENT
+# ============================================================
+
+class FakeAgent:
+    async def ainvoke(self, state):
+
+        messages = state.get("messages", [])
+
+        if messages:
+            last_message = messages[-1]
+
+            if isinstance(last_message, dict):
+                content = last_message.get(
+                    "content",
+                    "",
+                )
+            else:
+                content = getattr(
+                    last_message,
+                    "content",
+                    "",
+                )
+        else:
+            content = ""
+
+        reply = (
+            "Fake agent reply: "
+            f"I received your request: {content}"
+        )
+
+        return {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": reply,
+                }
+            ]
+        }
+
+
+# ============================================================
+# BUILD AGENT
+# ============================================================
+
+def build_agent():
+
+    if USE_FAKE:
+        return FakeAgent()
+
+    from langchain_openai import ChatOpenAI
+    from deepagents import create_deep_agent
+    from deepagents.backends.filesystem import FilesystemBackend
+
+    day3_root = Path(__file__).resolve().parent.parent
+
+    model = ChatOpenAI(
+        model="nvidia/nemotron-3-super-120b-a12b:free",
+        temperature=0,
+        base_url="https://openrouter.ai/api/v1",
+    )
+
+    backend = FilesystemBackend(
+        root_dir=day3_root,
+        virtual_mode=True,
+    )
+
+    system_prompt = (
+        "You are a helpful AI assistant. "
+        "Use the available tools when they are relevant. "
+        "You can calculate arithmetic expressions and provide the current time. "
+        "You also have filesystem access inside the Day 3 project directory. "
+        "Use available skills when appropriate."
+    )
+
+    agent = create_deep_agent(
+        model=model,
+        tools=[
+            calculate,
+            current_time,
+        ],
+        system_prompt=system_prompt,
+        backend=backend,
+        skills=[
+            "/skills/",
+        ],
+    )
+
+    return agent
+
+
+# ============================================================
+# SMOKE TEST
+# ============================================================
+
+async def main():
+
+    agent = build_agent()
+
+    result = await agent.ainvoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Hello. Tell me what tools "
+                        "you can use."
+                    ),
+                }
+            ]
+        }
+    )
+
+    messages = result.get(
+        "messages",
+        [],
+    )
+
+    if not messages:
+        print("No reply received.")
+        return
+
+    last_message = messages[-1]
+
+    if isinstance(last_message, dict):
+        print(
+            last_message.get(
+                "content",
+                last_message,
+            )
+        )
+    else:
+        print(
+            getattr(
+                last_message,
+                "content",
+                last_message,
+            )
+        )
+
+
+if __name__ == "__main__":
+
+    import asyncio
+
+    asyncio.run(
+        main()
+    )

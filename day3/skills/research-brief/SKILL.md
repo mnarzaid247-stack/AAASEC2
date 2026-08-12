@@ -1,19 +1,58 @@
 ---
 name: research-brief
-description: Write a one-page executive research brief on a technical topic, with a fixed structure the team expects.
+description: Create a concise research brief from a topic or question.
 ---
 
 # Research Brief
 
-When asked to produce a research brief, ALWAYS follow this structure:
+Use this skill when the user asks for a short research brief, summary, or structured analysis of a topic.
 
-1. **Headline** — one sentence, the single most important takeaway.
-2. **Context** — 2-3 sentences: why this topic matters right now.
-3. **Findings** — exactly three bullet points, each one concrete fact or trend.
-4. **Recommendation** — one clearly actionable next step.
-5. **Confidence** — Low / Medium / High, with a one-line justification.
+## Instructions
 
-Rules:
-- Total length under 200 words.
-- No marketing language. No "revolutionary", "game-changing", "cutting-edge".
-- If you used tools to gather facts, mention which tools at the bottom.
+When creating a research brief:
+
+1. Clearly identify the topic or question.
+2. Summarize the most important information.
+3. Organize the findings into clear sections.
+4. Separate factual findings from recommendations.
+5. Keep the writing concise and professional.
+6. Do not invent facts or sources.
+7. If information is missing, clearly state the limitation.
+
+## Output Format
+
+Use the following structure:
+
+```markdown
+# Research Brief: <Topic>
+
+## Executive Summary
+
+Provide a short summary of the main findings.
+
+## Key Findings
+
+- Finding 1
+- Finding 2
+- Finding 3
+
+## Analysis
+
+Explain the important patterns, implications, risks, or opportunities.
+
+## Recommendation
+
+Provide a concise recommendation based on the available information.
+
+## Limitations
+
+Mention any missing information or uncertainty.
+```
+
+## Writing Style
+
+- Professional
+- Clear
+- Concise
+- Evidence-focused
+- Avoid unnecessary repetition
